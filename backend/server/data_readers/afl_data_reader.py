@@ -7,32 +7,24 @@ from bs4 import BeautifulSoup, element
 import requests
 import pandas as pd
 
+from server.ml_models.data_config import TEAM_TRANSLATIONS
+
 
 AFL_DOMAIN = "https://www.afl.com.au"
-TEAM_SELECTORS = {
-    "team-coll": "Collingwood",
-    "team-carl": "Carlton",
-    "team-stk": "St Kilda",
-    "team-port": "Port Adelaide",
-    "team-bl": "Brisbane",
-    "team-melb": "Melbourne",
-    "team-nmfc": "North Melbourne",
-    "team-gcfc": "Gold Coast",
-    "team-fre": "Fremantle",
-    "team-syd": "Sydney",
-    "team-gws": "GWS",
-    "-mhsoa-orsz": "Adelaide",
-    "team-rich": "Richmond",
-    "team-haw": "Hawthorn",
-    "team-wce": "West Coast",
-    "team-geel": "Geelong",
-    "team-wb": "Western Bulldogs",
-    "team-ess": "Essendon",
-}
 
 
-def _parse_player_data(team_name: str, player_element: element) -> Dict[str, str]:
-    return {"team": team_name, "player_name": list(player_element.stripped_strings)[-1]}
+def _parse_player_data(
+    team_name: str, at_home: bool, player_element: element
+) -> Dict[str, str]:
+    team_attr = {"home_team": team_name} if at_home else {"away_team": team_name}
+
+    return {
+        **team_attr,
+        **{
+            "playing_for": team_name,
+            "player_name": list(player_element.stripped_strings)[-1],
+        },
+    }
 
 
 def _parse_team_data(
@@ -40,11 +32,12 @@ def _parse_team_data(
 ) -> List[Dict[str, str]]:
     team_name = next(team_element.stripped_strings)
     team_number = "1" if "team1" in team_element["class"] else "2"
+    at_home = team_number == "1"
 
     player_selector = f"#fieldInouts .posGroup .team{team_number} .player"
 
     return [
-        _parse_player_data(team_name, player_element)
+        _parse_player_data(team_name, at_home, player_element)
         for player_element in game_element.select(player_selector)
     ]
 
@@ -74,7 +67,9 @@ def get_rosters(round_number: Optional[int] = None) -> pd.DataFrame:
     """Fetches roster data for the upcoming round from afl.com.au"""
 
     roster_data = _fetch_rosters(round_number)
-    roster_data_frame = pd.DataFrame(roster_data)
+    roster_data_frame = pd.DataFrame(roster_data).assign(
+        playing_for=lambda df: df["playing_for"].map(TEAM_TRANSLATIONS)
+    )
     roster_data_frame.loc[:, "round_number"] = round_number
 
     return roster_data_frame

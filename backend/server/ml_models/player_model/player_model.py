@@ -207,17 +207,27 @@ class PlayerModelData(MLModelData, DataTransformerMixin):
             & (~data_frame["match_id"].isin(duplicate_matches))
         ]
 
-        self._data = (
-            self._compose_transformers(data_frame)  # pylint: disable=E1102
-            .fillna(0)
-            .set_index(index_cols, drop=False)
-            .rename_axis([None] * len(index_cols))
-            .sort_index()
-        )
+        self.data_frame = data_frame
+        self.index_cols = index_cols
+
+        # self._data = (
+        #     self._compose_transformers(data_frame)  # pylint: disable=E1102
+        #     .fillna(0)
+        #     .set_index(index_cols, drop=False)
+        #     .rename_axis([None] * len(index_cols))
+        #     .sort_index()
+        # )
 
     @property
     def data(self):
-        return self._data
+        return (
+            self._compose_transformers(self.data_frame)  # pylint: disable=E1102
+            .fillna(0)
+            .set_index(self.index_cols, drop=False)
+            .rename_axis([None] * len(self.index_cols))
+            .sort_index()
+        )
+        # return self._data
 
     @property
     def data_transformers(self):
